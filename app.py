@@ -179,7 +179,7 @@ def procesar_opcion(to, btn_id):
                         "🔹 *Plan Básico / Menú Interactivo*\n"
                         "• Configuración e instalación de la API oficial.\n"
                         "• Flujo interactivo con botones (hasta 5 secciones).\n"
-                        "• *Inversión:* $150 USD (pago único) + $35/mes de mantenimiento y servidor.\n\n"
+                        "• *Inversión:* $150 USD (pago único) + $25/mes de mantenimiento y servidor.\n\n"
                         "🔹 *Plan Pro / Captación y Flujos*\n"
                         "• Todo lo del plan básico + captura automática de datos (leads).\n"
                         "• Integración con Google Sheets o correo.\n"
