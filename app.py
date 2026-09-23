@@ -86,7 +86,7 @@ def enviar_mensaje_raw(payload):
 
 
 def enviar_menu_principal(to):
-    """Muestra un mensaje de bienvenida con 3 botones interactivos"""
+    """Muestra el menú de bienvenida con los servicios de tu agencia"""
     payload = {
         "messaging_product": "whatsapp",
         "to": to,
@@ -95,10 +95,9 @@ def enviar_menu_principal(to):
             "type": "button",
             "body": {
                 "text": (
-                    "¡Hola! 👋 Bienvenido al bot de demostración de *Agencia Bot*.\n\n"
-                    "🤖 Este es un prototipo interactivo. Recuerda que este flujo "
-                    "se personaliza al 100% según las necesidades específicas de tu negocio.\n\n"
-                    "¿Qué deseas explorar hoy?"
+                    "¡Hola! 👋 Bienvenido a *Agencia Bot*.\n\n"
+                    "Desarrollamos asistentes virtuales e integraciones de WhatsApp a la medida de tu negocio para automatizar tus ventas y atención 24/7.\n\n"
+                    "💡 *Estás interactuando con un bot en tiempo real.* Selecciona una opción para conocer nuestros planes:"
                 )
             },
             "footer": {
@@ -112,7 +111,7 @@ def enviar_menu_principal(to):
                     },
                     {
                         "type": "reply",
-                        "reply": {"id": "btn_ejemplos", "title": "💡 Casos de uso"}
+                        "reply": {"id": "btn_precios", "title": "💳 Planes y Precios"}
                     },
                     {
                         "type": "reply",
@@ -126,39 +125,125 @@ def enviar_menu_principal(to):
 
 
 def procesar_opcion(to, btn_id):
-    """Maneja las respuestas de cada botón"""
+    """Responde con detalle y siempre incluye botones al final para mantener la navegación activa"""
+    
     if btn_id == "btn_servicios":
-        texto = (
-            "🛠️ *Nuestros Servicios de Automatización:*\n\n"
-            "1️⃣ *Bots a medida:* Flujos conversacionales interactivos con botones y menús.\n"
-            "2️⃣ *Integraciones API:* Conexión con tu base de datos, CRM, Google Sheets o sistemas de pago.\n"
-            "3️⃣ *Respuestas con Inteligencia Artificial:* Integración con modelos de IA para atención 24/7 sin guiones rígidos.\n\n"
-            "📌 *Nota:* Todo se adapta a la lógica de tu empresa."
-        )
-    elif btn_id == "btn_ejemplos":
-        texto = (
-            "💡 *Casos de Uso Personalizables:*\n\n"
-            "• *Restaurantes / Menú:* Catálogo digital, pedidos automatizados y reservas.\n"
-            "• *Inmobiliarias & Citas:* Calificación de prospectos y agendamiento automático.\n"
-            "• *Soporte & FAQ:* Atención a clientes frecuente en tiempo real.\n"
-            "• *E-commerce:* Rastreo de pedidos y confirmación de compras."
-        )
-    elif btn_id == "btn_asesor":
-        texto = (
-            "👤 *Atención Personalizada:*\n\n"
-            "Un especialista comercial se pondrá en contacto contigo muy pronto para "
-            "analizar los requerimientos de tu negocio y diseñar una propuesta a tu medida.\n\n"
-            "¡Gracias por probar nuestra demo!"
-        )
-    else:
-        texto = "Opción no reconocida."
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": to,
+            "type": "interactive",
+            "interactive": {
+                "type": "button",
+                "body": {
+                    "text": (
+                        "🛠️ *Lo que podemos desarrollar para tu empresa:*\n\n"
+                        "1️⃣ *Bots de Menú Interactivo:* Flujos como este con botones rápidos, catálogos y respuestas frecuentes.\n"
+                        "2️⃣ *Captación de Prospectos:* Formularios automáticos para agendar citas o cotizaciones.\n"
+                        "3️⃣ *Integración con IA:* Respuestas inteligentes usando Inteligencia Artificial para atención fluida sin guiones rígidos.\n"
+                        "4️⃣ *Conexión a Sistemas:* Vinculación con tu base de datos, CRM, Google Sheets o pasarelas de pago.\n\n"
+                        "📌 *Nota:* Todos nuestros desarrollos son 100% personalizados."
+                    )
+                },
+                "footer": {
+                    "text": "¿Qué te gustaría hacer ahora?"
+                },
+                "action": {
+                    "buttons": [
+                        {
+                            "type": "reply",
+                            "reply": {"id": "btn_precios", "title": "💳 Ver Precios"}
+                        },
+                        {
+                            "type": "reply",
+                            "reply": {"id": "btn_asesor", "title": "👤 Contactar Asesor"}
+                        },
+                        {
+                            "type": "reply",
+                            "reply": {"id": "btn_menu", "title": "🔙 Menú Principal"}
+                        }
+                    ]
+                }
+            }
+        }
 
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": to,
-        "type": "text",
-        "text": {"body": texto}
-    }
+    elif btn_id == "btn_precios":
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": to,
+            "type": "interactive",
+            "interactive": {
+                "type": "button",
+                "body": {
+                    "text": (
+                        "💳 *Nuestros Planes de Inversión:*\n\n"
+                        "🔹 *Plan Básico / Menú Interactivo*\n"
+                        "• Configuración e instalación de la API oficial.\n"
+                        "• Flujo interactivo con botones (hasta 5 secciones).\n"
+                        "• *Inversión:* $150 USD (pago único) + $35/mes de mantenimiento y servidor.\n\n"
+                        "🔹 *Plan Pro / Captación y Flujos*\n"
+                        "• Todo lo del plan básico + captura automática de datos (leads).\n"
+                        "• Integración con Google Sheets o correo.\n"
+                        "• *Inversión:* $300 USD (pago único) + $50/mes.\n\n"
+                        "🔹 *Plan Personalizado / IA*\n"
+                        "• Bot inteligente con Inteligencia Artificial o integración a sistemas/CRM.\n"
+                        "• Cotización según requerimientos."
+                    )
+                },
+                "footer": {
+                    "text": "El plan mensual incluye servidor activo 24/7 y soporte."
+                },
+                "action": {
+                    "buttons": [
+                        {
+                            "type": "reply",
+                            "reply": {"id": "btn_asesor", "title": "👤 Cotizar mi Bot"}
+                        },
+                        {
+                            "type": "reply",
+                            "reply": {"id": "btn_servicios", "title": "🛠️ Ver Servicios"}
+                        },
+                        {
+                            "type": "reply",
+                            "reply": {"id": "btn_menu", "title": "🔙 Menú Principal"}
+                        }
+                    ]
+                }
+            }
+        }
+
+    elif btn_id == "btn_asesor":
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": to,
+            "type": "interactive",
+            "interactive": {
+                "type": "button",
+                "body": {
+                    "text": (
+                        "👤 *Atención Personalizada:*\n\n"
+                        "Un especialista de nuestro equipo se pondrá en contacto contigo en breve para evaluar las necesidades de tu negocio y diseñar una demostración a tu medida.\n\n"
+                        "Si deseas agilizar el proceso, por favor escríbenos a continuación el nombre de tu empresa o tipo de negocio. 🚀"
+                    )
+                },
+                "footer": {
+                    "text": "Agencia Bot"
+                },
+                "action": {
+                    "buttons": [
+                        {
+                            "type": "reply",
+                            "reply": {"id": "btn_menu", "title": "🔙 Volver al Menú"}
+                        }
+                    ]
+                }
+            }
+        }
+
+    else:
+        # Si presiona "Volver al Menú" o cualquier otra opción
+        enviar_menu_principal(to)
+        return
+
     enviar_mensaje_raw(payload)
 
 
