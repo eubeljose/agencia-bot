@@ -12,7 +12,6 @@ VERIFY_TOKEN = os.getenv('VERIFY_TOKEN', 'mibot123')
 WHATSAPP_TOKEN = os.getenv('WHATSAPP_TOKEN')
 PHONE_NUMBER_ID = os.getenv('PHONE_NUMBER_ID')
 
-# Guardado en memoria del Token de la API objetivo
 SESSION_DATA = {
     "token": None,
     "last_login": None
@@ -21,7 +20,6 @@ SESSION_DATA = {
 def obtener_token_valido():
     ahora = datetime.now()
     
-    # Reutilizar token si no ha pasado más de 8 minutos (480 s)
     if SESSION_DATA["token"] and SESSION_DATA["last_login"]:
         tiempo_transcurrido = (ahora - SESSION_DATA["last_login"]).total_seconds()
         if tiempo_transcurrido < 480:
@@ -57,16 +55,11 @@ def obtener_token_valido():
 
     try:
         res = requests.post(url_login, json=payload, headers=headers_login, timeout=12)
-        
-        # Intentar parsear la respuesta
         try:
             data = res.json()
         except Exception:
             data = {"raw_text": res.text}
 
-        print(f"DEBUG LOGIN - Status: {res.status_code}, Response: {data}")
-
-        # Extraer token si la autenticación fue exitosa
         nuevo_token = None
         if isinstance(data, dict):
             nuevo_token = data.get("token") or data.get("data", {}).get("token") or data.get("access_token")
@@ -76,31 +69,77 @@ def obtener_token_valido():
             SESSION_DATA["last_login"] = ahora
             return nuevo_token
         else:
-            # Retornar el detalle exacto para diagnosticar
-            SESSION_DATA["error_log"] = {"status_code": res.status_code, "response": data}
             return None
 
     except Exception as e:
-        SESSION_DATA["error_log"] = {"exception": str(e)}
         return None
 
+def consultar_ultimos_retiros(limit=3):
+    """Consulta la API interna y devuelve los últimos N retiros formateados para WhatsApp."""
+    token = obtener_token_valido()
+    if not token:
+        return "⚠️️ Error de autenticación con el servidor central."
+
+    ahora = datetime.now()
+    hace_dos_dias = ahora - timedelta(days=2)
+    begin_time = hace_dos_dias.strftime("%d-%m-%Y 00:00:00")
+    end_time = ahora.strftime("%d-%m-%Y 23:59:59")
+
+    url_target = "https://backendteammx.yippeeagent.com:90/prod-api/warteam/collect_record"
+    params = {
+        "pageNum": 1,
+        "pageSize": limit,
+        "captainId": "11332410",
+        "type": 1,
+        "params[beginTime]": begin_time,
+        "params[endTime]": end_time
+    }
+
+    headers = {
+        "accept": "application/json, text/plain, */*",
+        "authorization": f"Bearer {token}",
+        "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+    }
+
+    try:
+        res = requests.get(url_target, params=params, headers=headers, timeout=12)
+        data = res.json()
+        
+        rows = data.get("rows", [])
+        if not rows:
+            return "ℹ️ No se encontraron registros de retiros recientes."
+
+        mensaje = "📥 *ÚLTIMOS RETIROS REGISTRADOS*\n\n"
+        for i, item in enumerate(rows[:limit], 1):
+            monto = item.get("amount") or item.get("money") or item.get("collectAmount") or "N/A"
+            fecha = item.get("createTime") or item.get("time") or "N/A"
+            estado = item.get("statusStr") or item.get("status") or "Procesado"
+            usuario = item.get("userName") or item.get("captainName") or item.get("userId") or "N/A"
+
+            mensaje += f"*{i}. Retiro:* ${monto}\n"
+            mensaje += f"   👤 Usuario/ID: {usuario}\n"
+            mensaje += f"   📅 Fecha: {fecha}\n"
+            mensaje += f"   📌 Estado: {estado}\n\n"
+
+        return mensaje.strip()
+
+    except Exception as e:
+        return f"⚠️ Error consultando los retiros: {str(e)}"
+
 # ==============================================================================
-# RUTA PUENTE AUTOMATIZADA: MONITOREO DE RETIROS (BOTBUSINESS / EXTERNO)
+# RUTA PUENTE API (GET)
 # ==============================================================================
 @app.route('/api/retiros', methods=['GET'])
 def proxy_retiros():
     token = obtener_token_valido()
-    
     if not token:
         return jsonify({"error": "No se pudo autenticar contra el servidor remoto"}), 500
 
-    # Rango de fechas dinámico por defecto (Consultando desde hace 2 días hasta hoy)
     ahora = datetime.now()
     hace_dos_dias = ahora - timedelta(days=2)
     default_begin_time = hace_dos_dias.strftime("%d-%m-%Y 00:00:00")
     default_end_time = ahora.strftime("%d-%m-%Y 23:59:59")
 
-    # Permitir recibir parámetros opcionales por URL o usar los predeterminados
     page_num = request.args.get('pageNum', default=1, type=int)
     page_size = request.args.get('pageSize', default=10, type=int)
     captain_id = request.args.get('captainId', default="11332410")
@@ -109,7 +148,6 @@ def proxy_retiros():
     end_time = request.args.get('endTime', default=default_end_time)
 
     url_target = "https://backendteammx.yippeeagent.com:90/prod-api/warteam/collect_record"
-    
     params = {
         "pageNum": page_num,
         "pageSize": page_size,
@@ -121,19 +159,7 @@ def proxy_retiros():
 
     headers = {
         "accept": "application/json, text/plain, */*",
-        "accept-language": "es-419,es-VE;q=0.9,es;q=0.8,en-US;q=0.7,en;q=0.6,gl;q=0.5",
         "authorization": f"Bearer {token}",
-        "cache-control": "no-cache",
-        "Cookie": f"tt-Admin-Token={token}; sidebarStatus=0",
-        "pragma": "no-cache",
-        "priority": "u=1, i",
-        "referer": "https://backendteammx.yippeeagent.com:90/warteam/collection_cards_records",
-        "sec-ch-ua": '"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"Linux"',
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-origin",
         "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
     }
 
@@ -143,38 +169,12 @@ def proxy_retiros():
     except Exception as e:
         return jsonify({"error": "Fallo al consultar el backend de retiros", "details": str(e)}), 500
 
-
 # ==============================================================================
-# RUTAS DEL BOT DE WHATSAPP / AGENCIA
+# WEBHOOKS & RUTAS DE WHATSAPP
 # ==============================================================================
 @app.route('/privacy', methods=['GET'])
 def privacy_policy():
-    return """
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Política de Privacidad - Agencia Bot</title>
-        <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 40px auto; padding: 20px; color: #333; }
-            h1 { color: #075e54; }
-        </style>
-    </head>
-    <body>
-        <h1>Política de Privacidad</h1>
-        <p>En <strong>Agencia Bot</strong> respetamos y protegemos la privacidad de nuestros usuarios.</p>
-        <h2>1. Información que recopilamos</h2>
-        <p>Recopilamos únicamente el número de teléfono y los mensajes de texto enviados voluntariamente por los usuarios a través de WhatsApp para brindar respuestas automáticas.</p>
-        <h2>2. Uso de la información</h2>
-        <p>La información recibida se procesa en tiempo real exclusivamente para generar respuestas y no se comparte con terceros.</p>
-        <h2>3. Almacenamiento y Seguridad</h2>
-        <p>No almacenamos historiales de chat ni datos personales sensibles de forma permanente en servidores externos.</p>
-        <h2>4. Contacto</h2>
-        <p>Si tienes preguntas sobre esta política, puedes contactarnos a través de nuestros canales oficiales.</p>
-    </body>
-    </html>
-    """, 200
+    return "<h1>Política de Privacidad</h1><p>Servicio automatizado de WhatsApp.</p>", 200
 
 @app.route('/webhook', methods=['GET'])
 def verify_webhook():
@@ -201,8 +201,16 @@ def webhook():
                     sender_id = msg.get('from')
                     
                     if msg.get('type') == 'interactive':
-                        btn_id = msg['interactive']['button_reply']['id']
-                        procesar_opcion(sender_id, btn_id)
+                        interactive_type = msg['interactive'].get('type')
+                        
+                        # Manejo de respuesta de Lista
+                        if interactive_type == 'list_reply':
+                            opt_id = msg['interactive']['list_reply']['id']
+                            procesar_opcion(sender_id, opt_id)
+                        # Manejo de respuesta de Botones
+                        elif interactive_type == 'button_reply':
+                            opt_id = msg['interactive']['button_reply']['id']
+                            procesar_opcion(sender_id, opt_id)
                     
                     elif msg.get('type') == 'text':
                         enviar_menu_principal(sender_id)
@@ -210,9 +218,8 @@ def webhook():
         return jsonify({'status': 'EVENT_RECEIVED'}), 200
     return jsonify({'status': 'NOT_FOUND'}), 404
 
-
 # ==============================================================================
-# FUNCIONES AUXILIARES DE WHATSAPP
+# FUNCIONES MENÚ E INTERACCIÓN WHATSAPP
 # ==============================================================================
 def enviar_mensaje_raw(payload):
     url = f"https://graph.facebook.com/v20.0/{PHONE_NUMBER_ID}/messages"
@@ -223,35 +230,50 @@ def enviar_mensaje_raw(payload):
     requests.post(url, json=payload, headers=headers)
 
 def enviar_menu_principal(to):
+    """Utiliza mensaje tipo LISTA para soportar 4 opciones sin violar las políticas de Meta."""
     payload = {
         "messaging_product": "whatsapp",
         "to": to,
         "type": "interactive",
         "interactive": {
-            "type": "button",
+            "type": "list",
+            "header": {
+                "type": "text",
+                "text": "🤖 Menú Principal"
+            },
             "body": {
-                "text": (
-                    "¡Hola! 👋 Bienvenido a *Agencia Bot*.\n\n"
-                    "Desarrollamos asistentes virtuales e integraciones de WhatsApp a la medida de tu negocio para automatizar tus ventas y atención 24/7.\n\n"
-                    "💡 *Estás interactuando con un bot en tiempo real.* Selecciona una opción para conocer nuestros planes:"
-                )
+                "text": "Bienvenido a *Agencia Bot*. Selecciona una de las opciones de nuestro menú interactivo:"
             },
             "footer": {
-                "text": "Agencia Bot • Soluciones Automatizadas"
+                "text": "Selecciona una opción abajo 👇"
             },
             "action": {
-                "buttons": [
+                "button": "Ver Opciones",
+                "sections": [
                     {
-                        "type": "reply",
-                        "reply": {"id": "btn_servicios", "title": "🛠️ Servicios"}
-                    },
-                    {
-                        "type": "reply",
-                        "reply": {"id": "btn_precios", "title": "💳 Planes y Precios"}
-                    },
-                    {
-                        "type": "reply",
-                        "reply": {"id": "btn_asesor", "title": "👤 Contactar Asesor"}
+                        "title": "Consultas y Servicios",
+                        "rows": [
+                            {
+                                "id": "btn_retiros",
+                                "title": "📥 Últimos 3 Retiros",
+                                "description": "Consultar historial de retiros en tiempo real"
+                            },
+                            {
+                                "id": "btn_servicios",
+                                "title": "🛠️ Servicios",
+                                "description": "Conoce lo que podemos desarrollar"
+                            },
+                            {
+                                "id": "btn_precios",
+                                "title": "💳 Planes y Precios",
+                                "description": "Detalles de inversión y mantenimiento"
+                            },
+                            {
+                                "id": "btn_asesor",
+                                "title": "👤 Contactar Asesor",
+                                "description": "Hablar con un representante humano"
+                            }
+                        ]
                     }
                 ]
             }
@@ -260,7 +282,48 @@ def enviar_menu_principal(to):
     enviar_mensaje_raw(payload)
 
 def procesar_opcion(to, btn_id):
-    if btn_id == "btn_servicios":
+    if btn_id == "btn_retiros":
+        # 1. Enviar mensaje de espera al usuario
+        payload_espera = {
+            "messaging_product": "whatsapp",
+            "to": to,
+            "type": "text",
+            "text": {"body": "🔍 Consultando los últimos 3 retiros en la base de datos..."}
+        }
+        enviar_mensaje_raw(payload_espera)
+
+        # 2. Consultar la API
+        texto_retiros = consultar_ultimos_retiros(limit=3)
+
+        # 3. Enviar el resultado con botones para volver al menú
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": to,
+            "type": "interactive",
+            "interactive": {
+                "type": "button",
+                "body": {
+                    "text": texto_retiros
+                },
+                "footer": {
+                    "text": "Agencia Bot • Monitoreo de Retiros"
+                },
+                "action": {
+                    "buttons": [
+                        {
+                            "type": "reply",
+                            "reply": {"id": "btn_retiros", "title": "🔄 Actualizar"}
+                        },
+                        {
+                            "type": "reply",
+                            "reply": {"id": "btn_menu", "title": "🔙 Menú Principal"}
+                        }
+                    ]
+                }
+            }
+        }
+
+    elif btn_id == "btn_servicios":
         payload = {
             "messaging_product": "whatsapp",
             "to": to,
@@ -270,30 +333,18 @@ def procesar_opcion(to, btn_id):
                 "body": {
                     "text": (
                         "🛠️ *Lo que podemos desarrollar para tu empresa:*\n\n"
-                        "1️⃣ *Bots de Menú Interactivo:* Flujos como este con botones rápidos, catálogos y respuestas frecuentes.\n"
-                        "2️⃣ *Captación de Prospectos:* Formularios automáticos para agendar citas o cotizaciones.\n"
-                        "3️⃣ *Integración con IA:* Respuestas inteligentes usando Inteligencia Artificial para atención fluida sin guiones rígidos.\n"
-                        "4️⃣ *Conexión a Sistemas:* Vinculación con tu base de datos, CRM, Google Sheets o pasarelas de pago.\n\n"
-                        "📌 *Nota:* Todos nuestros desarrollos son 100% personalizados."
+                        "1️⃣ *Bots de Menú Interactivo:* Flujos interactivos con respuestas instantáneas.\n"
+                        "2️⃣ *Monitoreo de APIs / Retiros:* Extracción e integración de datos en tiempo real.\n"
+                        "3️⃣ *Integración con IA:* Respuestas fluidas mediante Inteligencia Artificial.\n"
+                        "4️⃣ *Conexión a Sistemas:* CRM, bases de datos o pasarelas de pago."
                     )
                 },
-                "footer": {
-                    "text": "¿Qué te gustaría hacer ahora?"
-                },
+                "footer": {"text": "¿Qué deseas hacer?"},
                 "action": {
                     "buttons": [
-                        {
-                            "type": "reply",
-                            "reply": {"id": "btn_precios", "title": "💳 Ver Precios"}
-                        },
-                        {
-                            "type": "reply",
-                            "reply": {"id": "btn_asesor", "title": "👤 Contactar Asesor"}
-                        },
-                        {
-                            "type": "reply",
-                            "reply": {"id": "btn_menu", "title": "🔙 Menú Principal"}
-                        }
+                        {"type": "reply", "reply": {"id": "btn_precios", "title": "💳 Ver Precios"}},
+                        {"type": "reply", "reply": {"id": "btn_asesor", "title": "👤 Contactar Asesor"}},
+                        {"type": "reply", "reply": {"id": "btn_menu", "title": "🔙 Menú Principal"}}
                     ]
                 }
             }
@@ -308,37 +359,17 @@ def procesar_opcion(to, btn_id):
                 "type": "button",
                 "body": {
                     "text": (
-                        "💳 *Nuestros Planes de Inversión:*\n\n"
-                        "🔹 *Plan Básico / Menú Interactivo*\n"
-                        "• Configuración e instalación de la API oficial.\n"
-                        "• Flujo interactivo con botones (hasta 5 secciones).\n"
-                        "• *Inversión:* $150 USD (pago único) + $25/mes de mantenimiento y servidor.\n\n"
-                        "🔹 *Plan Pro / Captación y Flujos*\n"
-                        "• Todo lo del plan básico + captura automática de datos (leads).\n"
-                        "• Integración con Google Sheets o correo.\n"
-                        "• *Inversión:* $300 USD (pago único) + $50/mes.\n\n"
-                        "🔹 *Plan Personalizado / IA*\n"
-                        "• Bot inteligente con Inteligencia Artificial o integración a sistemas/CRM.\n"
-                        "• Cotización según requerimientos."
+                        "💳 *Planes de Inversión:*\n\n"
+                        "🔹 *Plan Básico / Menú Interactivo:* $150 USD + $25/mes.\n"
+                        "🔹 *Plan Pro / Integración API & Leads:* $300 USD + $50/mes.\n"
+                        "🔹 *Plan IA / Personalizado:* Cotización según sistema."
                     )
                 },
-                "footer": {
-                    "text": "El plan mensual incluye servidor activo 24/7 y soporte."
-                },
+                "footer": {"text": "Servidores activos 24/7 con soporte"},
                 "action": {
                     "buttons": [
-                        {
-                            "type": "reply",
-                            "reply": {"id": "btn_asesor", "title": "👤 Cotizar mi Bot"}
-                        },
-                        {
-                            "type": "reply",
-                            "reply": {"id": "btn_servicios", "title": "🛠️ Ver Servicios"}
-                        },
-                        {
-                            "type": "reply",
-                            "reply": {"id": "btn_menu", "title": "🔙 Menú Principal"}
-                        }
+                        {"type": "reply", "reply": {"id": "btn_asesor", "title": "👤 Cotizar mi Bot"}},
+                        {"type": "reply", "reply": {"id": "btn_menu", "title": "🔙 Menú Principal"}}
                     ]
                 }
             }
@@ -352,32 +383,26 @@ def procesar_opcion(to, btn_id):
             "interactive": {
                 "type": "button",
                 "body": {
-                    "text": (
-                        "👤 *Atención Personalizada:*\n\n"
-                        "Un especialista de nuestro equipo se pondrá en contacto contigo en breve para evaluar las necesidades de tu negocio y diseñar una demostración a tu medida.\n\n"
-                        "Si deseas agilizar el proceso, por favor escríbenos a continuación el nombre de tu empresa o tipo de negocio. 🚀"
-                    )
+                    "text": "👤 Un asesor te contactará a la brevedad. Por favor indícanos tu nombre o negocio."
                 },
-                "footer": {
-                    "text": "Agencia Bot"
-                },
+                "footer": {"text": "Agencia Bot"},
                 "action": {
                     "buttons": [
-                        {
-                            "type": "reply",
-                            "reply": {"id": "btn_menu", "title": "🔙 Volver al Menú"}
-                        }
+                        {"type": "reply", "reply": {"id": "btn_menu", "title": "🔙 Volver al Menú"}}
                     ]
                 }
             }
         }
+
+    elif btn_id == "btn_menu":
+        enviar_menu_principal(to)
+        return
 
     else:
         enviar_menu_principal(to)
         return
 
     enviar_mensaje_raw(payload)
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
