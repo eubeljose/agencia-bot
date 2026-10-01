@@ -83,6 +83,7 @@ def obtener_token_valido():
     except Exception as e:
         SESSION_DATA["error_log"] = {"exception": str(e)}
         return None
+
 # ==============================================================================
 # RUTA PUENTE AUTOMATIZADA: MONITOREO DE RETIROS (BOTBUSINESS)
 # ==============================================================================
