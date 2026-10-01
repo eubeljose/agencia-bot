@@ -1,14 +1,20 @@
 import os
 import requests
+from datetime import datetime
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# Configuraciones existentes
+# ==============================================================================
+# CONFIGURACIONES EXISTENTES (WHATSAPP BOT)
+# ==============================================================================
 VERIFY_TOKEN = os.getenv('VERIFY_TOKEN', 'mibot123')
 WHATSAPP_TOKEN = os.getenv('WHATSAPP_TOKEN')
 PHONE_NUMBER_ID = os.getenv('PHONE_NUMBER_ID')
 
+# ==============================================================================
+# RUTAS DEL BOT DE WHATSAPP / AGENCIA
+# ==============================================================================
 @app.route('/privacy', methods=['GET'])
 def privacy_policy():
     return """
@@ -75,6 +81,47 @@ def webhook():
     return jsonify({'status': 'NOT_FOUND'}), 404
 
 
+# ==============================================================================
+# NUEVA RUTA PROXY / PUENTE: SISTEMA DE MONITOREO DE RETIROS (BOTBUSINESS)
+# Esta ruta no afecta ni interfiere con las funciones de WhatsApp descritas arriba.
+# ==============================================================================
+@app.route('/api/retiros', methods=['GET'])
+def proxy_retiros():
+    # Rango de fechas dinámico (Día actual)
+    hoy_str = datetime.now().strftime("%d-%m-%Y")
+    begin_time = f"{hoy_str} 00:00:00"
+    end_time = f"{hoy_str} 23:59:59"
+
+    url_target = "https://backendteammx.yippeeagent.com:90/prod-api/warteam/collect_record"
+    
+    params = {
+        "pageNum": 1,
+        "pageSize": 10,
+        "captainId": "11332410",
+        "type": 1,
+        "params[beginTime]": begin_time,
+        "params[endTime]": end_time
+    }
+
+    headers = {
+        "accept": "application/json, text/plain, */*",
+        "accept-language": "es-419,es-VE;q=0.9,es;q=0.8,en-US;q=0.7,en;q=0.6,gl;q=0.5",
+        "authorization": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJsb2dpbl91c2VyX2tleSI6ImU3NmY4MjBlLWQyNjMtNDllNi1iNDc5LTNlYTAwN2ZmYTQ1ZiJ9.gXEd1xGFk8vu2ydI7c-8D8TtVPz7kf7zT8-zYntQx5d5KQG1WBojCFQKCQZa9Io1jwC5J5ZE3WymqMqnDMl2QA",
+        "Cookie": "tt-Admin-Token=eyJhbGciOiJIUzUxMiJ9.eyJsb2dpbl91c2VyX2tleSI6ImU3NmY4MjBlLWQyNjMtNDllNi1iNDc5LTNlYTAwN2ZmYTQ1ZiJ9.gXEd1xGFk8vu2ydI7c-8D8TtVPz7kf7zT8-zYntQx5d5KQG1WBojCFQKCQZa9Io1jwC5J5ZE3WymqMqnDMl2QA; sidebarStatus=0",
+        "referer": "https://backendteammx.yippeeagent.com:90/warteam/collection_cards_records",
+        "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+    }
+
+    try:
+        response = requests.get(url_target, params=params, headers=headers, timeout=12)
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        return jsonify({"error": "Fallo al consultar el backend de retiros", "details": str(e)}), 500
+
+
+# ==============================================================================
+# FUNCIONES AUXILIARES DE WHATSAPP
+# ==============================================================================
 def enviar_mensaje_raw(payload):
     """Envía la solicitud a la API oficial de Meta en WhatsApp Cloud"""
     url = f"https://graph.facebook.com/v20.0/{PHONE_NUMBER_ID}/messages"
@@ -240,7 +287,6 @@ def procesar_opcion(to, btn_id):
         }
 
     else:
-        # Si presiona "Volver al Menú" o cualquier otra opción
         enviar_menu_principal(to)
         return
 
