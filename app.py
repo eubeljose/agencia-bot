@@ -106,9 +106,18 @@ def proxy_retiros():
     headers = {
         "accept": "application/json, text/plain, */*",
         "accept-language": "es-419,es-VE;q=0.9,es;q=0.8,en-US;q=0.7,en;q=0.6,gl;q=0.5",
-        "authorization": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJsb2dpbl91c2VyX2tleSI6ImU3NmY4MjBlLWQyNjMtNDllNi1iNDc5LTNlYTAwN2ZmYTQ1ZiJ9.gXEd1xGFk8vu2ydI7c-8D8TtVPz7kf7zT8-zYntQx5d5KQG1WBojCFQKCQZa9Io1jwC5J5ZE3WymqMqnDMl2QA",
-        "Cookie": "tt-Admin-Token=eyJhbGciOiJIUzUxMiJ9.eyJsb2dpbl91c2VyX2tleSI6ImU3NmY4MjBlLWQyNjMtNDllNi1iNDc5LTNlYTAwN2ZmYTQ1ZiJ9.gXEd1xGFk8vu2ydI7c-8D8TtVPz7kf7zT8-zYntQx5d5KQG1WBojCFQKCQZa9Io1jwC5J5ZE3WymqMqnDMl2QA; sidebarStatus=0",
+        "authorization": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJsb2dpbl91c2VyX2tleSI6IjI3ODU1Y2UyLWIzNTYtNDczYy1iYWE4LWRlN2Y3OGNmNDE1ZSJ9.Imqx_ovxZrFKN5UhPXjNP9rl8x2Fu32bioLlkptZmt9Aqp2bhilBEuL7HhQ1bWfKnWE738xvNS9wsQMFlJ0z3A",
+        "cache-control": "no-cache",
+        "Cookie": "tt-Admin-Token=eyJhbGciOiJIUzUxMiJ9.eyJsb2dpbl91c2VyX2tleSI6IjI3ODU1Y2UyLWIzNTYtNDczYy1iYWE4LWRlN2Y3OGNmNDE1ZSJ9.Imqx_ovxZrFKN5UhPXjNP9rl8x2Fu32bioLlkptZmt9Aqp2bhilBEuL7HhQ1bWfKnWE738xvNS9wsQMFlJ0z3A; sidebarStatus=0",
+        "pragma": "no-cache",
+        "priority": "u=1, i",
         "referer": "https://backendteammx.yippeeagent.com:90/warteam/collection_cards_records",
+        "sec-ch-ua": '"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Linux"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
         "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
     }
 
