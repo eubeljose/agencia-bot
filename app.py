@@ -75,10 +75,10 @@ def obtener_token_valido():
         return None
 
 def consultar_ultimos_retiros(limit=3):
-    """Consulta la API interna y devuelve los últimos N retiros formateados para WhatsApp."""
+    """Consulta la API interna y devuelve los últimos N registros formateados correctamente."""
     token = obtener_token_valido()
     if not token:
-        return "⚠️️ Error de autenticación con el servidor central."
+        return "⚠️ Error de autenticación con el servidor central."
 
     ahora = datetime.now()
     hace_dos_dias = ahora - timedelta(days=2)
@@ -86,9 +86,11 @@ def consultar_ultimos_retiros(limit=3):
     end_time = ahora.strftime("%d-%m-%Y 23:59:59")
 
     url_target = "https://backendteammx.yippeeagent.com:90/prod-api/warteam/collect_record"
+    
+    # Se piden suficientes registros para capturar los últimos del arreglo
     params = {
         "pageNum": 1,
-        "pageSize": limit,
+        "pageSize": 50,
         "captainId": "11332410",
         "type": 1,
         "params[beginTime]": begin_time,
@@ -101,6 +103,13 @@ def consultar_ultimos_retiros(limit=3):
         "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
     }
 
+    # Mapa de estados numéricos a texto legible
+    MAPA_ESTADOS = {
+        6: "Apoyo realizado",
+        3: "Pendiente",
+        4: "Sin completar"
+    }
+
     try:
         res = requests.get(url_target, params=params, headers=headers, timeout=12)
         data = res.json()
@@ -109,15 +118,20 @@ def consultar_ultimos_retiros(limit=3):
         if not rows:
             return "ℹ️ No se encontraron registros de retiros recientes."
 
-        mensaje = "📥 *ÚLTIMOS RETIROS REGISTRADOS*\n\n"
-        for i, item in enumerate(rows[:limit], 1):
-            monto = item.get("amount") or item.get("money") or item.get("collectAmount") or "N/A"
-            fecha = item.get("createTime") or item.get("time") or "N/A"
-            estado = item.get("statusStr") or item.get("status") or "Procesado"
-            usuario = item.get("userName") or item.get("captainName") or item.get("userId") or "N/A"
+        # Invertimos la lista para obtener primero los registros más recientes
+        rows_recientes = list(reversed(rows))[:limit]
 
-            mensaje += f"*{i}. Retiro:* ${monto}\n"
-            mensaje += f"   👤 Usuario/ID: {usuario}\n"
+        mensaje = "📥 *ÚLTIMOS RETIROS REGISTRADOS*\n\n"
+        for i, item in enumerate(rows_recientes, 1):
+            jugador = item.get("name", "N/A")
+            uid = item.get("uid", "N/A")
+            cartas = item.get("num", 0)
+            fecha = item.get("time") or "N/A"
+            status_code = item.get("status")
+            estado = MAPA_ESTADOS.get(status_code, f"Estado {status_code}")
+
+            mensaje += f"*{i}. Jugador:* {jugador} (ID: {uid})\n"
+            mensaje += f"   🃏 Cartas obtenidas: *{cartas}*\n"
             mensaje += f"   📅 Fecha: {fecha}\n"
             mensaje += f"   📌 Estado: {estado}\n\n"
 
