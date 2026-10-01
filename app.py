@@ -85,7 +85,7 @@ def obtener_token_valido():
         return None
 
 # ==============================================================================
-# RUTA PUENTE AUTOMATIZADA: MONITOREO DE RETIROS (BOTBUSINESS)
+# RUTA PUENTE AUTOMATIZADA: MONITOREO DE RETIROS (BOTBUSINESS / EXTERNO)
 # ==============================================================================
 @app.route('/api/retiros', methods=['GET'])
 def proxy_retiros():
@@ -94,19 +94,27 @@ def proxy_retiros():
     if not token:
         return jsonify({"error": "No se pudo autenticar contra el servidor remoto"}), 500
 
-    # Rango de fechas dinámico (Consultando desde hace 2 días hasta hoy)
+    # Rango de fechas dinámico por defecto (Consultando desde hace 2 días hasta hoy)
     ahora = datetime.now()
     hace_dos_dias = ahora - timedelta(days=2)
-    begin_time = hace_dos_dias.strftime("%d-%m-%Y 00:00:00")
-    end_time = ahora.strftime("%d-%m-%Y 23:59:59")
+    default_begin_time = hace_dos_dias.strftime("%d-%m-%Y 00:00:00")
+    default_end_time = ahora.strftime("%d-%m-%Y 23:59:59")
+
+    # Permitir recibir parámetros opcionales por URL o usar los predeterminados
+    page_num = request.args.get('pageNum', default=1, type=int)
+    page_size = request.args.get('pageSize', default=10, type=int)
+    captain_id = request.args.get('captainId', default="11332410")
+    type_val = request.args.get('type', default=1)
+    begin_time = request.args.get('beginTime', default=default_begin_time)
+    end_time = request.args.get('endTime', default=default_end_time)
 
     url_target = "https://backendteammx.yippeeagent.com:90/prod-api/warteam/collect_record"
     
     params = {
-        "pageNum": 1,
-        "pageSize": 10,
-        "captainId": "11332410",
-        "type": 1,
+        "pageNum": page_num,
+        "pageSize": page_size,
+        "captainId": captain_id,
+        "type": type_val,
         "params[beginTime]": begin_time,
         "params[endTime]": end_time
     }
@@ -372,4 +380,4 @@ def procesar_opcion(to, btn_id):
 
 
 if __name__ == '__main__':
-    app.run(port=5000)
+    app.run(host='0.0.0.0', port=5000)
