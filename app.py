@@ -1,16 +1,137 @@
 import os
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
 # ==============================================================================
-# CONFIGURACIONES EXISTENTES (WHATSAPP BOT)
+# CONFIGURACIONES Y VARIABLES GLOBALES DE SESIÓN
 # ==============================================================================
 VERIFY_TOKEN = os.getenv('VERIFY_TOKEN', 'mibot123')
 WHATSAPP_TOKEN = os.getenv('WHATSAPP_TOKEN')
 PHONE_NUMBER_ID = os.getenv('PHONE_NUMBER_ID')
+
+# Guardado en memoria del Token de la API objetivo
+SESSION_DATA = {
+    "token": None,
+    "last_login": None
+}
+
+def obtener_token_valido():
+    """
+    Obtiene un Bearer Token válido haciendo login automático si el actual
+    no existe o si transcurrieron más de 8 minutos.
+    """
+    ahora = datetime.now()
+    
+    # Si tenemos un token reciente (menos de 8 minutos de antigüedad), lo reutilizamos
+    if SESSION_DATA["token"] and SESSION_DATA["last_login"]:
+        tiempo_transcurrido = (ahora - SESSION_DATA["last_login"]).total_seconds()
+        if tiempo_transcurrido < 480:  # 480 segundos = 8 minutos
+            return SESSION_DATA["token"]
+
+    # Solicitud de renovación de token (Login)
+    url_login = "https://backendteammx.yippeeagent.com:90/prod-api/login"
+    payload = {
+        "username": "5930685",
+        "password": "siglo2026",
+        "uuid": "419dac0e82834818a0ce05d069dbd467",
+        "seller": True
+    }
+    headers_login = {
+        "accept": "application/json, text/plain, */*",
+        "accept-language": "es-419,es-VE;q=0.9,es;q=0.8,en-US;q=0.7,en;q=0.6,gl;q=0.5",
+        "cache-control": "no-cache",
+        "content-type": "application/json;charset=UTF-8",
+        "Cookie": "sidebarStatus=0",
+        "istoken": "false",
+        "origin": "https://backendteammx.yippeeagent.com:90",
+        "pragma": "no-cache",
+        "priority": "u=1, i",
+        "referer": "https://backendteammx.yippeeagent.com:90/login?redirect=%2Findex",
+        "repeatsubmit": "false",
+        "sec-ch-ua": '"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Linux"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+    }
+
+    try:
+        res = requests.post(url_login, json=payload, headers=headers_login, timeout=12)
+        data = res.get_json()
+        
+        # Extraer token según la estructura de respuesta habitual ("token" o dentro de "data")
+        nuevo_token = None
+        if isinstance(data, dict):
+            nuevo_token = data.get("token") or data.get("data", {}).get("token")
+        
+        if nuevo_token:
+            SESSION_DATA["token"] = nuevo_token
+            SESSION_DATA["last_login"] = ahora
+            return nuevo_token
+        else:
+            raise Exception(f"No se encontró token en la respuesta de login: {data}")
+
+    except Exception as e:
+        print(f"Error en auto-login: {str(e)}")
+        return None
+
+
+# ==============================================================================
+# RUTA PUENTE AUTOMATIZADA: MONITOREO DE RETIROS (BOTBUSINESS)
+# ==============================================================================
+@app.route('/api/retiros', methods=['GET'])
+def proxy_retiros():
+    token = obtener_token_valido()
+    
+    if not token:
+        return jsonify({"error": "No se pudo autenticar contra el servidor remoto"}), 500
+
+    # Rango de fechas dinámico (Consultando desde hace 2 días hasta hoy)
+    ahora = datetime.now()
+    hace_dos_dias = ahora - timedelta(days=2)
+    begin_time = hace_dos_dias.strftime("%d-%m-%Y 00:00:00")
+    end_time = ahora.strftime("%d-%m-%Y 23:59:59")
+
+    url_target = "https://backendteammx.yippeeagent.com:90/prod-api/warteam/collect_record"
+    
+    params = {
+        "pageNum": 1,
+        "pageSize": 10,
+        "captainId": "11332410",
+        "type": 1,
+        "params[beginTime]": begin_time,
+        "params[endTime]": end_time
+    }
+
+    headers = {
+        "accept": "application/json, text/plain, */*",
+        "accept-language": "es-419,es-VE;q=0.9,es;q=0.8,en-US;q=0.7,en;q=0.6,gl;q=0.5",
+        "authorization": f"Bearer {token}",
+        "cache-control": "no-cache",
+        "Cookie": f"tt-Admin-Token={token}; sidebarStatus=0",
+        "pragma": "no-cache",
+        "priority": "u=1, i",
+        "referer": "https://backendteammx.yippeeagent.com:90/warteam/collection_cards_records",
+        "sec-ch-ua": '"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Linux"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+    }
+
+    try:
+        response = requests.get(url_target, params=params, headers=headers, timeout=12)
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        return jsonify({"error": "Fallo al consultar el backend de retiros", "details": str(e)}), 500
+
 
 # ==============================================================================
 # RUTAS DEL BOT DE WHATSAPP / AGENCIA
@@ -68,12 +189,10 @@ def webhook():
                     msg = messages[0]
                     sender_id = msg.get('from')
                     
-                    # 1. Si el usuario hace clic en un botón interactivo
                     if msg.get('type') == 'interactive':
                         btn_id = msg['interactive']['button_reply']['id']
                         procesar_opcion(sender_id, btn_id)
                     
-                    # 2. Si el usuario envía un mensaje de texto normal
                     elif msg.get('type') == 'text':
                         enviar_menu_principal(sender_id)
                         
@@ -82,57 +201,9 @@ def webhook():
 
 
 # ==============================================================================
-# NUEVA RUTA PROXY / PUENTE: SISTEMA DE MONITOREO DE RETIROS (BOTBUSINESS)
-# Esta ruta no afecta ni interfiere con las funciones de WhatsApp descritas arriba.
-# ==============================================================================
-@app.route('/api/retiros', methods=['GET'])
-def proxy_retiros():
-    # Rango de fechas dinámico (Día actual)
-    hoy_str = datetime.now().strftime("%d-%m-%Y")
-    begin_time = f"{hoy_str} 00:00:00"
-    end_time = f"{hoy_str} 23:59:59"
-
-    url_target = "https://backendteammx.yippeeagent.com:90/prod-api/warteam/collect_record"
-    
-    params = {
-        "pageNum": 1,
-        "pageSize": 10,
-        "captainId": "11332410",
-        "type": 1,
-        "params[beginTime]": begin_time,
-        "params[endTime]": end_time
-    }
-
-    headers = {
-        "accept": "application/json, text/plain, */*",
-        "accept-language": "es-419,es-VE;q=0.9,es;q=0.8,en-US;q=0.7,en;q=0.6,gl;q=0.5",
-        "authorization": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJsb2dpbl91c2VyX2tleSI6IjI3ODU1Y2UyLWIzNTYtNDczYy1iYWE4LWRlN2Y3OGNmNDE1ZSJ9.Imqx_ovxZrFKN5UhPXjNP9rl8x2Fu32bioLlkptZmt9Aqp2bhilBEuL7HhQ1bWfKnWE738xvNS9wsQMFlJ0z3A",
-        "cache-control": "no-cache",
-        "Cookie": "tt-Admin-Token=eyJhbGciOiJIUzUxMiJ9.eyJsb2dpbl91c2VyX2tleSI6IjI3ODU1Y2UyLWIzNTYtNDczYy1iYWE4LWRlN2Y3OGNmNDE1ZSJ9.Imqx_ovxZrFKN5UhPXjNP9rl8x2Fu32bioLlkptZmt9Aqp2bhilBEuL7HhQ1bWfKnWE738xvNS9wsQMFlJ0z3A; sidebarStatus=0",
-        "pragma": "no-cache",
-        "priority": "u=1, i",
-        "referer": "https://backendteammx.yippeeagent.com:90/warteam/collection_cards_records",
-        "sec-ch-ua": '"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"Linux"',
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-origin",
-        "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
-    }
-
-    try:
-        response = requests.get(url_target, params=params, headers=headers, timeout=12)
-        return jsonify(response.json()), response.status_code
-    except Exception as e:
-        return jsonify({"error": "Fallo al consultar el backend de retiros", "details": str(e)}), 500
-
-
-# ==============================================================================
 # FUNCIONES AUXILIARES DE WHATSAPP
 # ==============================================================================
 def enviar_mensaje_raw(payload):
-    """Envía la solicitud a la API oficial de Meta en WhatsApp Cloud"""
     url = f"https://graph.facebook.com/v20.0/{PHONE_NUMBER_ID}/messages"
     headers = {
         "Authorization": f"Bearer {WHATSAPP_TOKEN}",
@@ -140,9 +211,7 @@ def enviar_mensaje_raw(payload):
     }
     requests.post(url, json=payload, headers=headers)
 
-
 def enviar_menu_principal(to):
-    """Muestra el menú de bienvenida con los servicios de tu agencia"""
     payload = {
         "messaging_product": "whatsapp",
         "to": to,
@@ -179,10 +248,7 @@ def enviar_menu_principal(to):
     }
     enviar_mensaje_raw(payload)
 
-
 def procesar_opcion(to, btn_id):
-    """Responde con detalle y siempre incluye botones al final para mantener la navegación activa"""
-    
     if btn_id == "btn_servicios":
         payload = {
             "messaging_product": "whatsapp",
