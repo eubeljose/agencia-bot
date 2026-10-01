@@ -75,7 +75,7 @@ def obtener_token_valido():
         return None
 
 def consultar_ultimos_retiros(limit=3):
-    """Consulta la API interna y devuelve los últimos N registros formateados correctamente."""
+    """Consulta la API interna y devuelve los últimos N registros formateados correctamente con hora ajustada (+2h)."""
     token = obtener_token_valido()
     if not token:
         return "⚠️ Error de autenticación con el servidor central."
@@ -87,7 +87,6 @@ def consultar_ultimos_retiros(limit=3):
 
     url_target = "https://backendteammx.yippeeagent.com:90/prod-api/warteam/collect_record"
     
-    # Se piden suficientes registros para capturar los últimos del arreglo
     params = {
         "pageNum": 1,
         "pageSize": 50,
@@ -103,7 +102,6 @@ def consultar_ultimos_retiros(limit=3):
         "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
     }
 
-    # Mapa de estados numéricos a texto legible
     MAPA_ESTADOS = {
         6: "Apoyo realizado",
         3: "Pendiente",
@@ -126,13 +124,23 @@ def consultar_ultimos_retiros(limit=3):
             jugador = item.get("name", "N/A")
             uid = item.get("uid", "N/A")
             cartas = item.get("num", 0)
-            fecha = item.get("time") or "N/A"
+            fecha_raw = item.get("time")
             status_code = item.get("status")
             estado = MAPA_ESTADOS.get(status_code, f"Estado {status_code}")
 
+            # --- AJUSTE DE ZONA HORARIA (+2 HORAS) ---
+            fecha_ajustada = "N/A"
+            if fecha_raw:
+                try:
+                    dt_orig = datetime.strptime(fecha_raw, "%Y-%m-%d %H:%M:%S")
+                    dt_local = dt_orig + timedelta(hours=2)
+                    fecha_ajustada = dt_local.strftime("%Y-%m-%d %I:%M:%S %p")
+                except ValueError:
+                    fecha_ajustada = fecha_raw
+
             mensaje += f"*{i}. Jugador:* {jugador} (ID: {uid})\n"
             mensaje += f"   🃏 Cartas obtenidas: *{cartas}*\n"
-            mensaje += f"   📅 Fecha: {fecha}\n"
+            mensaje += f"   📅 Fecha: {fecha_ajustada}\n"
             mensaje += f"   📌 Estado: {estado}\n\n"
 
         return mensaje.strip()
