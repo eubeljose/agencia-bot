@@ -19,19 +19,14 @@ SESSION_DATA = {
 }
 
 def obtener_token_valido():
-    """
-    Obtiene un Bearer Token válido haciendo login automático si el actual
-    no existe o si transcurrieron más de 8 minutos.
-    """
     ahora = datetime.now()
     
-    # Si tenemos un token reciente (menos de 8 minutos de antigüedad), lo reutilizamos
+    # Reutilizar token si no ha pasado más de 8 minutos (480 s)
     if SESSION_DATA["token"] and SESSION_DATA["last_login"]:
         tiempo_transcurrido = (ahora - SESSION_DATA["last_login"]).total_seconds()
-        if tiempo_transcurrido < 480:  # 480 segundos = 8 minutos
+        if tiempo_transcurrido < 480:
             return SESSION_DATA["token"]
 
-    # Solicitud de renovación de token (Login)
     url_login = "https://backendteammx.yippeeagent.com:90/prod-api/login"
     payload = {
         "username": "5930685",
@@ -62,25 +57,32 @@ def obtener_token_valido():
 
     try:
         res = requests.post(url_login, json=payload, headers=headers_login, timeout=12)
-        data = res.get_json()
         
-        # Extraer token según la estructura de respuesta habitual ("token" o dentro de "data")
+        # Intentar parsear la respuesta
+        try:
+            data = res.json()
+        except Exception:
+            data = {"raw_text": res.text}
+
+        print(f"DEBUG LOGIN - Status: {res.status_code}, Response: {data}")
+
+        # Extraer token si la autenticación fue exitosa
         nuevo_token = None
         if isinstance(data, dict):
-            nuevo_token = data.get("token") or data.get("data", {}).get("token")
+            nuevo_token = data.get("token") or data.get("data", {}).get("token") or data.get("access_token")
         
         if nuevo_token:
             SESSION_DATA["token"] = nuevo_token
             SESSION_DATA["last_login"] = ahora
             return nuevo_token
         else:
-            raise Exception(f"No se encontró token en la respuesta de login: {data}")
+            # Retornar el detalle exacto para diagnosticar
+            SESSION_DATA["error_log"] = {"status_code": res.status_code, "response": data}
+            return None
 
     except Exception as e:
-        print(f"Error en auto-login: {str(e)}")
+        SESSION_DATA["error_log"] = {"exception": str(e)}
         return None
-
-
 # ==============================================================================
 # RUTA PUENTE AUTOMATIZADA: MONITOREO DE RETIROS (BOTBUSINESS)
 # ==============================================================================
