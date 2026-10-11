@@ -192,6 +192,43 @@ def proxy_retiros():
         return jsonify({"error": "Fallo al consultar el backend de retiros", "details": str(e)}), 500
 
 # ==============================================================================
+# NUEVO ENDPOINT KEEPALIVE PARA FASTCRON
+# ==============================================================================
+@app.route('/api/keepalive', methods=['GET'])
+def keepalive_portal():
+    token = obtener_token_valido()
+    if not token:
+        return jsonify({"code": -1, "msg": "Error de autenticacion en backend"}), 500
+
+    # Generar timestamp actual en formato epoch
+    current_time_epoch = int(datetime.now().timestamp())
+    
+    url_online = "https://franchiser.conquianvamos.com/online.php"
+    params = {
+        "account": "5930685",
+        "channel": "2006",
+        "time": current_time_epoch,
+        "function": "setOnlineTime",
+        "type": "1"
+    }
+    
+    headers = {
+        "accept": "application/json, text/plain, */*",
+        "authorization": f"Bearer {token}",
+        "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+    }
+
+    try:
+        response = requests.get(url_online, params=params, headers=headers, timeout=10)
+        # Intentar retornar JSON o texto crudo si coincide
+        try:
+            return jsonify(response.json()), response.status_code
+        except Exception:
+            return response.text, response.status_code
+    except Exception as e:
+        return jsonify({"code": -1, "error": str(e)}), 500
+
+# ==============================================================================
 # WEBHOOKS & RUTAS DE WHATSAPP
 # ==============================================================================
 @app.route('/privacy', methods=['GET'])
