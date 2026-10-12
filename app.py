@@ -140,8 +140,8 @@ def consultar_ultimos_retiros(limit=3):
                 except ValueError:
                     fecha_str = fecha_raw
 
-            mensaje += f"*{i}. Jugador:* {jugador} (ID: {uid})\n"
-            mensaje += f"   🃏 Cartas obtenidas: *{cartas}*\n"
+            mensaje += f"*{i}.* {jugador} (ID: {uid})\n"
+            mensaje += f"   🃏 Platas obtenidas: *{cartas}*\n"
             mensaje += f"   📅 Fecha: {fecha_str}\n"
             mensaje += f"   ⏱️ Hora: {hora_str}\n"
             mensaje += f"   📌 Estado: {estado}\n\n"
