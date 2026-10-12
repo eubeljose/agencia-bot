@@ -75,7 +75,7 @@ def obtener_token_valido():
         return None
 
 def consultar_ultimos_retiros(limit=3):
-    """Consulta la API interna y devuelve los últimos N registros formateados correctamente con hora ajustada (+2h)."""
+    """Consulta la API interna y devuelve los últimos N registros formateados con fecha y hora en líneas separadas (+2h)."""
     token = obtener_token_valido()
     if not token:
         return "⚠️ Error de autenticación con el servidor central."
@@ -128,19 +128,22 @@ def consultar_ultimos_retiros(limit=3):
             status_code = item.get("status")
             estado = MAPA_ESTADOS.get(status_code, f"Estado {status_code}")
 
-            # --- AJUSTE DE ZONA HORARIA (+2 HORAS) ---
-            fecha_ajustada = "N/A"
+            # --- AJUSTE DE ZONA HORARIA Y SEPARACIÓN DE FECHA / HORA (+2 HORAS) ---
+            fecha_str = "N/A"
+            hora_str = "N/A"
             if fecha_raw:
                 try:
                     dt_orig = datetime.strptime(fecha_raw, "%Y-%m-%d %H:%M:%S")
                     dt_local = dt_orig + timedelta(hours=2)
-                    fecha_ajustada = dt_local.strftime("%Y-%m-%d %I:%M:%S %p")
+                    fecha_str = dt_local.strftime("%Y-%m-%d")
+                    hora_str = dt_local.strftime("%I:%M:%S %p")
                 except ValueError:
-                    fecha_ajustada = fecha_raw
+                    fecha_str = fecha_raw
 
             mensaje += f"*{i}. Jugador:* {jugador} (ID: {uid})\n"
             mensaje += f"   🃏 Cartas obtenidas: *{cartas}*\n"
-            mensaje += f"   📅 Fecha: {fecha_ajustada}\n"
+            mensaje += f"   📅 Fecha: {fecha_str}\n"
+            mensaje += f"   ⏱️ Hora: {hora_str}\n"
             mensaje += f"   📌 Estado: {estado}\n\n"
 
         return mensaje.strip()
